@@ -8,7 +8,7 @@ import argparse
 import itertools
 import subprocess
 from time import sleep
-from Queue import Queue
+import queue
 from threading import Thread
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -27,7 +27,7 @@ CONST_PASSWORD = "P@55word!"
 class METAFORCE(object):
 
     def __init__(self, wordlist, knownlist):
-        self.guesses = Queue(maxsize=0)
+        self.guesses = queue.Queue(maxsize=0)
         self.wordlist = wordlist
         self.knownlist = self._string_to_list(knownlist)
         self.chrome_driver = None
@@ -95,38 +95,34 @@ class METAFORCE(object):
 
         try:
             while True:
-                self.chrome_driver.get("chrome-extension://nkbihfbeogaeaoehlefnkodbefgpgknn/popup.html")
+                self.chrome_driver.get("chrome-extension://nkbihfbeogaeaoehlefnkodbefgpgknn/home.html")
+                self.chrome_driver.implicitly_wait(20)
 
-                #PRIVACY NOTICE
-                self.chrome_driver.find_element_by_xpath("//*[contains(text(), 'Accept')]").click()
-                self.chrome_driver.implicitly_wait(0.5)
+                self.chrome_driver.find_element_by_css_selector('button.button').click()
+                self.chrome_driver.implicitly_wait(2)
 
-                #TERMS OF USE
-                eula = self.chrome_driver.find_element_by_xpath('//*[@id="app-content"]/div/div[4]/div/div')
-                self.chrome_driver.execute_script('arguments[0].scrollTop = arguments[0].scrollHeight', eula)
-                self.chrome_driver.find_element_by_xpath('//*[@id="app-content"]/div/div[4]/div/button').click()
+                self.chrome_driver.find_element_by_xpath("//*[contains(text(), 'Import wallet')]").click()
+                self.chrome_driver.implicitly_wait(2)
 
-                #IMPORT EXISTING DEN
-                self.chrome_driver.find_element_by_xpath("//*[contains(text(), 'Import Existing DEN')]").click()
+                self.chrome_driver.find_element_by_css_selector('button.btn-primary').click()
+                self.chrome_driver.implicitly_wait(3)
+
+                textarea = self.chrome_driver.find_element_by_css_selector("div.first-time-flow__seedphrase input")
+                password1 = self.chrome_driver.find_element_by_id("password")
+                password2 = self.chrome_driver.find_element_by_id("confirm-password")
+                clicked = False
 
                 #WALLET RECOVERY
                 while not self.guesses.empty():
                     stub_guess = self.guesses.get()
-                    self.chrome_driver.implicitly_wait(1)
+                    self.chrome_driver.implicitly_wait(3)
 
-                    #Attempt tp catch successful login
-                    if self._check_exists_by_xpath('//*[@id="app-content"]/div/div[4]/div/div/div[2]/button[2]'):
-                        print "It DOES exist.."
+                    try:
+                        print(self.chrome_driver.find_element_by_xpath("//*[contains(text(), 'All done')]"))
                         return
-                    else:
-                        print 'attempting %s' % stub_guess
+                    except Exception as e:
+                        print('All done not found')
 
-
-
-
-                    textarea = self.chrome_driver.find_element_by_class_name("twelve-word-phrase")
-                    password1 = self.chrome_driver.find_element_by_id("password-box")
-                    password2 = self.chrome_driver.find_element_by_id("password-box-confirm")
 
                     self._clear_field(textarea)
                     self._clear_field(password1)
@@ -136,7 +132,17 @@ class METAFORCE(object):
                     password1.send_keys(CONST_PASSWORD)
                     password2.send_keys(CONST_PASSWORD)
 
-                    self.chrome_driver.find_element_by_xpath('//*[@id="app-content"]/div/div[4]/div/div/button[2]').click()
+                    if (clicked == False):
+                        self.chrome_driver.execute_script("document.getElementsByClassName('first-time-flow__checkbox')[0].click()");
+                        self.chrome_driver.execute_script("document.getElementsByClassName('first-time-flow__checkbox')[1].click()");
+                        clicked = True
+
+                    try:
+                        self.chrome_driver.find_element_by_css_selector('button.button').click()
+                        self.chrome_driver.implicitly_wait(3)
+                    except Exception as e:
+                        print(e)
+                        print('cant validate')
 
                     self.guesses.task_done()
 
@@ -144,9 +150,6 @@ class METAFORCE(object):
         except KeyboardInterrupt:
             print "Exiting by User Interrupt"
             self.chrome_driver.quit()
-
-
-
 
 
 
